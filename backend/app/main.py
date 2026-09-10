@@ -11,22 +11,25 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS Configuration - Restricted to FRONTEND_URL and local origins
+# CORS Configuration - Restricted to FRONTEND_URL, local origins, and Render/Vercel domains
 allowed_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "https://medikiosk-3.onrender.com"
 ]
 
 if settings.FRONTEND_URL:
     for url in settings.FRONTEND_URL.split(","):
-        cleaned_url = url.strip()
+        cleaned_url = url.strip().rstrip("/")
         if cleaned_url and cleaned_url not in allowed_origins:
             allowed_origins.append(cleaned_url)
+            allowed_origins.append(f"{cleaned_url}/")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.onrender\.com|https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
