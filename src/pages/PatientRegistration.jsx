@@ -9,13 +9,10 @@ import {
   AlertCircle, 
   Sparkles,
   ArrowRight,
-  Droplet,
-  Lock
+  Droplet
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getCurrentCase, updateCurrentCase } from '../services/caseStore';
-import { sendOtp } from '../services/apiService';
-import OtpModal from '../components/OtpModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function PatientRegistration() {
@@ -39,10 +36,6 @@ export default function PatientRegistration() {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-
-  // OTP Modal State
-  const [isOtpOpen, setIsOtpOpen] = useState(false);
-  const [isOtpDemoMode, setIsOtpDemoMode] = useState(true);
 
   useEffect(() => {
     // Keep language in sync with context
@@ -97,43 +90,29 @@ export default function PatientRegistration() {
 
     setIsSubmitting(true);
     try {
-      // Trigger OTP sending API / Demo check
-      const otpRes = await sendOtp(formData.phone.trim());
-      if (!otpRes.success) {
-        setSubmitError(otpRes.message || 'Unable to send OTP.');
-        setIsSubmitting(false);
-        return;
-      }
-      setIsOtpDemoMode(otpRes.isDemo);
+      // Save Patient Details & update Single Case ID object directly
+      const updated = updateCurrentCase({
+        patient: {
+          name: formData.name.trim(),
+          age: formData.age,
+          gender: formData.gender,
+          phone: formData.phone.trim(),
+          bloodGroup: formData.bloodGroup,
+          preferredLanguage: currentLanguageObj.name,
+          otpVerified: true,
+          isOtpDemo: false
+        }
+      });
+
+      setCurrentCase(updated);
       setIsSubmitting(false);
-      setIsOtpOpen(true); // Open OTP verification modal
+
+      // Proceed directly to Step 2: Clinical History
+      navigate('/clinical-history');
     } catch (err) {
-      setSubmitError('Unable to send OTP. Please try again.');
+      setSubmitError('Unable to save registration details. Please try again.');
       setIsSubmitting(false);
     }
-  };
-
-  const handleOtpVerified = (wasDemoMode) => {
-    setIsOtpOpen(false);
-
-    // Save Patient Details & update Single Case ID object
-    const updated = updateCurrentCase({
-      patient: {
-        name: formData.name.trim(),
-        age: formData.age,
-        gender: formData.gender,
-        phone: formData.phone.trim(),
-        bloodGroup: formData.bloodGroup,
-        preferredLanguage: currentLanguageObj.name,
-        otpVerified: true,
-        isOtpDemo: wasDemoMode
-      }
-    });
-
-    setCurrentCase(updated);
-
-    // Proceed to Step 2: Clinical History
-    navigate('/clinical-history');
   };
 
   return (
@@ -153,95 +132,97 @@ export default function PatientRegistration() {
 
         <h1 className="registration-title" style={{ marginTop: '0.75rem' }}>{t('patientRegistration')}</h1>
         <p className="registration-subtitle">
-          Enter patient personal details, select language, and complete mobile verification.
+          Please enter basic demographic details to create a new clinical intake session.
         </p>
-
-        {/* Stepper */}
-        <div className="stepper-timeline">
-          <div className="stepper-item active" aria-current="step">
-            <div className="stepper-circle">1</div>
-            <span className="stepper-label">1. Registration</span>
-          </div>
-          <div className="stepper-item disabled">
-            <div className="stepper-circle">2</div>
-            <span className="stepper-label">2. History</span>
-          </div>
-          <div className="stepper-item disabled">
-            <div className="stepper-circle">3</div>
-            <span className="stepper-label">3. Hospitals</span>
-          </div>
-          <div className="stepper-item disabled">
-            <div className="stepper-circle">4</div>
-            <span className="stepper-label">4. Report</span>
-          </div>
-        </div>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="registration-form" noValidate>
-        {submitError && (
-          <div className="alert alert-danger" role="alert">
-            <AlertCircle size={20} />
-            <span>{submitError}</span>
-          </div>
-        )}
+      {submitError && (
+        <div className="alert alert-danger" style={{ marginBottom: '1.5rem' }}>
+          <AlertCircle size={20} />
+          <span>{submitError}</span>
+        </div>
+      )}
 
-        <div className="form-grid">
-          {/* 1. Full Name */}
-          <div className={`form-group ${errors.name ? 'has-error' : ''}`}>
-            <label htmlFor="field-name" className="form-label">
-              {t('fullName')} <span className="required-star">*</span>
+      {/* Main Registration Form */}
+      <form onSubmit={handleSubmit} className="registration-form-card" noValidate>
+        <div className="form-grid-2">
+          {/* Full Name */}
+          <div className="form-group">
+            <label htmlFor="name" className="form-label required">
+              <User size={18} className="label-icon" />
+              <span>{t('fullName')}</span>
             </label>
             <div className="input-wrapper">
-              <User className="input-icon" size={20} />
               <input
-                id="field-name"
-                type="text"
+                id="name"
                 name="name"
+                type="text"
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="e.g. Ramesh Kumar"
-                className="form-input"
+                className={`form-input ${errors.name ? 'input-error' : ''}`}
                 required
               />
             </div>
-            {errors.name && <div className="error-message"><span>{errors.name}</span></div>}
+            {errors.name && <span className="field-error-text">{errors.name}</span>}
           </div>
 
-          {/* 2. Age */}
-          <div className={`form-group ${errors.age ? 'has-error' : ''}`}>
-            <label htmlFor="field-age" className="form-label">
-              {t('age')} <span className="required-star">*</span>
+          {/* Phone Number */}
+          <div className="form-group">
+            <label htmlFor="phone" className="form-label required">
+              <Phone size={18} className="label-icon" />
+              <span>{t('phone')}</span>
             </label>
             <div className="input-wrapper">
-              <Calendar className="input-icon" size={20} />
               <input
-                id="field-age"
-                type="number"
+                id="phone"
+                name="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="e.g. +91 98765 43210"
+                className={`form-input ${errors.phone ? 'input-error' : ''}`}
+                required
+              />
+            </div>
+            {errors.phone && <span className="field-error-text">{errors.phone}</span>}
+          </div>
+
+          {/* Age */}
+          <div className="form-group">
+            <label htmlFor="age" className="form-label required">
+              <Calendar size={18} className="label-icon" />
+              <span>{t('age')}</span>
+            </label>
+            <div className="input-wrapper">
+              <input
+                id="age"
                 name="age"
+                type="number"
+                min="1"
+                max="125"
                 value={formData.age}
                 onChange={handleChange}
                 placeholder="e.g. 45"
-                min="1"
-                max="125"
-                className="form-input"
+                className={`form-input ${errors.age ? 'input-error' : ''}`}
                 required
               />
             </div>
-            {errors.age && <div className="error-message"><span>{errors.age}</span></div>}
+            {errors.age && <span className="field-error-text">{errors.age}</span>}
           </div>
 
-          {/* 3. Gender */}
-          <div className={`form-group ${errors.gender ? 'has-error' : ''}`}>
-            <label htmlFor="field-gender" className="form-label">
-              {t('gender')} <span className="required-star">*</span>
+          {/* Gender */}
+          <div className="form-group">
+            <label htmlFor="gender" className="form-label required">
+              <User size={18} className="label-icon" />
+              <span>{t('gender')}</span>
             </label>
             <select
-              id="field-gender"
+              id="gender"
               name="gender"
               value={formData.gender}
               onChange={handleChange}
-              className="form-select"
+              className={`form-select ${errors.gender ? 'input-error' : ''}`}
               required
             >
               <option value="">Select Gender</option>
@@ -250,72 +231,48 @@ export default function PatientRegistration() {
               <option value="Other">{t('other')}</option>
               <option value="Prefer not to say">{t('preferNotToSay')}</option>
             </select>
-            {errors.gender && <div className="error-message"><span>{errors.gender}</span></div>}
+            {errors.gender && <span className="field-error-text">{errors.gender}</span>}
           </div>
 
-          {/* 4. Phone Number */}
-          <div className={`form-group ${errors.phone ? 'has-error' : ''}`}>
-            <label htmlFor="field-phone" className="form-label">
-              {t('phone')} <span className="required-star">*</span>
-            </label>
-            <div className="input-wrapper">
-              <Phone className="input-icon" size={20} />
-              <input
-                id="field-phone"
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="e.g. 9876543210"
-                className="form-input"
-                required
-              />
-            </div>
-            {errors.phone && <div className="error-message"><span>{errors.phone}</span></div>}
-          </div>
-
-          {/* 5. Blood Group (Support Unknown & Prefer not to say) */}
+          {/* Blood Group */}
           <div className="form-group">
-            <label htmlFor="field-bloodGroup" className="form-label">
-              {t('bloodGroup')}
+            <label htmlFor="bloodGroup" className="form-label">
+              <Droplet size={18} className="label-icon" />
+              <span>{t('bloodGroup')}</span>
             </label>
-            <div className="input-wrapper">
-              <Droplet className="input-icon" size={20} />
-              <select
-                id="field-bloodGroup"
-                name="bloodGroup"
-                value={formData.bloodGroup}
-                onChange={handleChange}
-                className="form-select"
-              >
-                <option value="unknown">{t('unknown')}</option>
-                <option value="prefer_not_to_say">{t('preferNotToSay')}</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
-              </select>
-            </div>
+            <select
+              id="bloodGroup"
+              name="bloodGroup"
+              value={formData.bloodGroup}
+              onChange={handleChange}
+              className="form-select"
+            >
+              <option value="unknown">{t('unknown')}</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+            </select>
           </div>
 
-          {/* 6. Preferred Language Selection (11 Indian Languages) */}
+          {/* Preferred Language */}
           <div className="form-group">
-            <label htmlFor="field-language" className="form-label">
-              {t('preferredLanguage')} (11 Indian Languages)
+            <label htmlFor="language" className="form-label">
+              <Globe size={18} className="label-icon" />
+              <span>{t('preferredLanguage')}</span>
             </label>
             <div className="input-wrapper">
-              <Globe className="input-icon" size={20} />
               <select
-                id="field-language"
+                id="language"
                 value={formData.preferredLanguageCode}
                 onChange={handleLanguageChange}
                 className="form-select"
               >
-                {LANGUAGES.map(l => (
+                {LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>
                     {l.native} ({l.name})
                   </option>
@@ -325,7 +282,7 @@ export default function PatientRegistration() {
           </div>
         </div>
 
-        {/* Submit */}
+        {/* Submit Button - Direct Proceed without OTP */}
         <div className="form-actions" style={{ marginTop: '2rem' }}>
           <button
             type="submit"
@@ -333,26 +290,17 @@ export default function PatientRegistration() {
             className="btn btn-primary btn-large btn-submit"
           >
             {isSubmitting ? (
-              <LoadingSpinner message="Sending Verification..." size="small" />
+              <LoadingSpinner message="Saving Intake Session..." size="small" />
             ) : (
               <>
-                <Lock size={20} />
-                <span>Verify OTP & Continue</span>
+                <CheckCircle2 size={20} />
+                <span>Proceed to Clinical History</span>
                 <ArrowRight size={22} />
               </>
             )}
           </button>
         </div>
       </form>
-
-      {/* OTP Verification Modal */}
-      <OtpModal
-        phone={formData.phone}
-        isOpen={isOtpOpen}
-        isDemo={isOtpDemoMode}
-        onClose={() => setIsOtpOpen(false)}
-        onVerified={handleOtpVerified}
-      />
     </div>
   );
 }
