@@ -1,8 +1,9 @@
 import { DEMO_HOSPITALS } from '../data/hospitalsData';
 import { calculateDistanceKm } from '../utils/haversine';
 
-// Base API URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL !== undefined && import.meta.env.VITE_API_BASE_URL !== '' 
+  ? import.meta.env.VITE_API_BASE_URL 
+  : (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
 /**
  * Send SMS OTP via FastAPI backend or fallback to local Demo OTP (1234)
