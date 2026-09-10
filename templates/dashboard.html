@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doctor Dashboard - MediKiosk</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="brand-container">
+      <div class="brand-logo">👨‍⚕️</div>
+      <div>
+        <span class="brand-title">MediKiosk Doctor Workstation</span>
+        <span class="brand-badge" style="background: rgba(16,185,129,0.15); color: var(--accent-emerald);">Live OPD Queue</span>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a href="/" class="nav-btn">Patient Kiosk</a>
+      <a href="/dashboard" class="nav-btn active">Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="main-content">
+    
+    <!-- Top Stats -->
+    <div class="form-grid-2" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
+      <div class="glass-card" style="margin: 0; padding: 1.25rem;">
+        <span style="color: var(--text-muted); font-size: 0.85rem;">TOTAL INTAKE TODAY</span>
+        <h2 style="font-size: 2rem; color: #fff; margin-top: 0.25rem;">{{ patients|length }} Patients</h2>
+      </div>
+      <div class="glass-card" style="margin: 0; padding: 1.25rem;">
+        <span style="color: var(--text-muted); font-size: 0.85rem;">EMERGENCY RED-FLAGS</span>
+        <h2 style="font-size: 2rem; color: var(--accent-rose); margin-top: 0.25rem;">
+          {{ patients | selectattr('is_red_flag', 'equalto', 1) | list | length }} Urgent
+        </h2>
+      </div>
+      <div class="glass-card" style="margin: 0; padding: 1.25rem;">
+        <span style="color: var(--text-muted); font-size: 0.85rem;">SAVED CONSULT TIME</span>
+        <h2 style="font-size: 2rem; color: var(--accent-cyan); margin-top: 0.25rem;">
+          ~{{ (patients|length) * 4 }} Mins
+        </h2>
+      </div>
+    </div>
+
+    <!-- Patient Queue Table -->
+    <div class="glass-card">
+      <h2>📋 Incoming Patient Clinical Summaries</h2>
+      <p style="margin-bottom: 1rem;">Select a patient to view full AI intake history and digitized prescriptions.</p>
+
+      {% if not patients %}
+        <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+          <p>No patients registered yet. Use the <a href="/" style="color: var(--accent-cyan);">Patient Kiosk</a> to add test data.</p>
+        </div>
+      {% else %}
+        <table class="dashboard-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Patient Name</th>
+              <th>Age / Sex</th>
+              <th>Chief Complaint</th>
+              <th>Triage Status</th>
+              <th>Doctor Review</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in patients %}
+              <tr style="{% if p.is_red_flag %}background: rgba(244, 63, 94, 0.1);{% endif %}">
+                <td>#{{ p.id }}</td>
+                <td><strong>{{ p.name }}</strong></td>
+                <td>{{ p.age }} / {{ p.gender }}</td>
+                <td>{{ p.chief_complaint or 'Intake in progress' }}</td>
+                <td>
+                  {% if p.is_red_flag %}
+                    <span class="badge badge-red">🚨 RED FLAG</span>
+                  {% else %}
+                    <span class="badge badge-green">Normal</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color);">
+                    {{ p.doctor_status or 'Pending Review' }}
+                  </span>
+                </td>
+                <td>
+                  <button class="btn btn-secondary" onclick="viewPatientDetail({{ p.id }})" style="padding: 0.4rem 0.85rem; font-size: 0.85rem;">
+                    View Summary 👁️
+                  </button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </div>
+
+    <!-- Patient Detail Modal/Drawer -->
+    <div id="patientModal" class="glass-card" style="display: none; border-color: var(--accent-cyan);">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1rem;">
+        <h2 id="modalPatientTitle" style="margin: 0;">Patient Summary</h2>
+        <button class="btn btn-secondary" onclick="closeModal()" style="padding: 0.3rem 0.75rem;">✕ Close</button>
+      </div>
+
+      <div id="modalContentContainer"></div>
+
+      <div style="margin-top: 1.5rem; text-align: right; display: flex; justify-content: flex-end; gap: 1rem;">
+        <button class="btn btn-secondary" onclick="printSummary()">🖨️ Print Clinical Note</button>
+        <button class="btn btn-primary" onclick="approveSummary()">✅ Approve & Add to EMR</button>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    let activePatientId = null;
+
+    async function viewPatientDetail(id) {
+      activePatientId = id;
+      try {
+        const res = await fetch(`/api/patient/${id}`);
+        const data = await res.json();
+        
+        const modal = document.getElementById('patientModal');
+        const container = document.getElementById('modalContentContainer');
+        document.getElementById('modalPatientTitle').innerText = `Clinical Summary - ${data.patient.name} (#${data.patient.id})`;
+
+        let docListHtml = '';
+        if (data.documents && data.documents.length) {
+          docListHtml = '<h3>📄 Digitized Medical Documents</h3><ul>';
+          data.documents.forEach(d => {
+            docListHtml += `<li><strong>[${d.document_type}]</strong> <a href="/uploads/${d.filename}" target="_blank" style="color: var(--accent-cyan);">${d.filename}</a><br><small style="color: var(--text-muted);">${d.detected_entities}</small></li>`;
+          });
+          docListHtml += '</ul><br>';
+        }
+
+        container.innerHTML = `
+          ${docListHtml}
+          <h3>🤖 AI Structured Intake Note</h3>
+          <div class="summary-box" id="editableSummaryText">${data.summary ? data.summary.structured_summary : 'No summary available.'}</div>
+        `;
+
+        modal.style.display = 'block';
+        modal.scrollIntoView({ behavior: 'smooth' });
+      } catch (err) {
+        alert('Failed to load patient summary.');
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('patientModal').style.display = 'none';
+    }
+
+    async function approveSummary() {
+      if (!activePatientId) return;
+      try {
+        const summaryText = document.getElementById('editableSummaryText')?.innerText;
+        await fetch('/api/verify-summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patient_id: activePatientId,
+            status: 'Approved & Pushed to EMR',
+            notes: 'Verified by Attending Physician',
+            summary_text: summaryText
+          })
+        });
+        alert('✅ Clinical Summary approved and linked to EMR/ABHA!');
+        location.reload();
+      } catch (err) {
+        alert('Error approving summary.');
+      }
+    }
+
+    function printSummary() {
+      const content = document.getElementById('editableSummaryText')?.innerText;
+      const win = window.open('', '', 'width=800,height=600');
+      win.document.write(`<pre style="font-family: monospace; padding: 20px;">${content}</pre>`);
+      win.document.close();
+      win.print();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clinical History - MediKiosk</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="brand-container">
+      <div class="brand-logo">🩺</div>
+      <div>
+        <span class="brand-title">MediKiosk Intake</span>
+        <span class="brand-badge">Patient: {{ patient.name }} ({{ patient.age }}Y / {{ patient.gender }})</span>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a href="/" class="nav-btn">New Patient</a>
+      <a href="/dashboard" class="nav-btn primary">👨‍⚕️ Doctor Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="main-content">
+    <!-- Hidden Holders -->
+    <input type="hidden" id="patientIdHolder" value="{{ patient.id }}">
+    <input type="hidden" id="preferredLanguage" value="{{ patient.language }}">
+
+    <!-- Emergency Alert Banner (Hidden by default) -->
+    <div id="emergencyAlertBanner" class="emergency-banner" style="display: none;">
+      <div class="emergency-icon">🚨</div>
+      <div>
+        <h3 style="color: var(--accent-rose); margin-bottom: 0.2rem;">CRITICAL RED-FLAG SYMPTOM DETECTED</h3>
+        <p style="color: #fff; margin: 0;">
+          <strong id="redFlagReasonText">Chest pain detected.</strong> Emergency triage notification triggered! Please proceed directly to the Emergency Desk.
+        </p>
+      </div>
+    </div>
+
+    <!-- Document Upload Card -->
+    <div class="glass-card">
+      <h2>📄 Medical Document Scanner & OCR Extraction</h2>
+      <p style="margin-bottom: 1rem;">Upload or scan previous physical prescriptions, lab reports, or discharge summaries.</p>
+
+      <div class="form-grid-2" style="margin-bottom: 1rem;">
+        <div class="form-group">
+          <label for="docTypeSelect">Document Type</label>
+          <select id="docTypeSelect" class="form-control">
+            <option value="Prescription">Prescription</option>
+            <option value="Lab Report">Lab Report</option>
+            <option value="Discharge Summary">Discharge Summary</option>
+            <option value="Scan / Imaging">Scan / X-Ray Report</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>File Upload</label>
+          <input type="file" id="documentFile" style="display: none;" accept="image/*,.pdf">
+          <div id="documentDropzone" class="upload-dropzone">
+            <div class="upload-icon">📤</div>
+            <strong>Click to upload document or scan image</strong>
+            <p style="font-size: 0.85rem; margin-top: 0.2rem;">Supports JPG, PNG, PDF</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="ocrStatusBox"></div>
+    </div>
+
+    <!-- Clinical History Form -->
+    <div class="glass-card">
+      <h2>🩺 AI Multimodal Clinical Questionnaire</h2>
+      <p style="margin-bottom: 1.5rem;">Answer the following questions using text or voice recording.</p>
+
+      <form id="clinicalHistoryForm">
+        <input type="hidden" name="patient_id" value="{{ patient.id }}">
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <label for="chief_complaint" style="margin: 0;">1. Chief Complaint (What problem brings you today?) *</label>
+            <button type="button" class="btn btn-mic" data-target="chief_complaint">🎤 Voice Input</button>
+          </div>
+          <input type="text" id="chief_complaint" name="chief_complaint" class="form-control" placeholder="e.g. Chest pain and fever" required>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="duration">Duration (How long have you had this problem?)</label>
+            <input type="text" id="duration" name="duration" class="form-control" placeholder="e.g. 2 days / 3 weeks">
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <label for="hpi" style="margin: 0;">History of Present Illness (SOCRATES framework)</label>
+              <button type="button" class="btn btn-mic" data-target="hpi">🎤 Voice</button>
+            </div>
+            <input type="text" id="hpi" name="hpi" class="form-control" placeholder="e.g. Sharp pain when walking, radiating to left shoulder">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="past_history">Past Medical History</label>
+            <input type="text" id="past_history" name="past_history" class="form-control" placeholder="e.g. Type 2 Diabetes, Hypertension">
+          </div>
+
+          <div class="form-group">
+            <label for="current_meds">Current Medications & Dosages</label>
+            <input type="text" id="current_meds" name="current_meds" class="form-control" placeholder="e.g. Metformin 500mg twice daily">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="allergies">Known Allergies</label>
+            <input type="text" id="allergies" name="allergies" class="form-control" placeholder="e.g. Penicillin / No known allergies">
+          </div>
+
+          <div class="form-group">
+            <label for="ayush_prakriti">AYUSH / Prakriti Intake (Optional)</label>
+            <select id="ayush_prakriti" name="ayush_prakriti" class="form-control">
+              <option value="Not Assessed">Select Prakriti (Optional)</option>
+              <option value="Vata Dominant">Vata Dominant</option>
+              <option value="Pitta Dominant">Pitta Dominant</option>
+              <option value="Kapha Dominant">Kapha Dominant</option>
+              <option value="Vata-Pitta">Vata-Pitta Dual</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="text-align: right; margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-primary" style="padding: 1rem 2.5rem;">
+            Generate AI Clinical Summary →
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- AI Output Box -->
+    <div id="summaryOutputContainer" class="glass-card" style="display: none;">
+      <h2>🤖 Physician-Ready AI Clinical Summary</h2>
+      <p style="margin-bottom: 1rem;">This summary is formatted and routed to the Doctor Dashboard instantly.</p>
+      
+      <div id="summaryTextDisplay" class="summary-box"></div>
+
+      <div style="margin-top: 1.5rem; text-align: right;">
+        <a href="/dashboard" class="btn btn-primary">Go to Doctor Dashboard →</a>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
